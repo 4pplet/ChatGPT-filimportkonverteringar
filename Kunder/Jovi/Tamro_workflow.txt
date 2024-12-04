@@ -1,0 +1,109 @@
+
+# Instructions for ChatGPT File Conversion Workflow
+
+## Introduction
+Welcome to the file import conversion tool using ChatGPT! Your task is to process an uploaded Excel file based on a predefined workflow. **Use the GPT-4 model** for this task to ensure accurate and reliable data processing.
+
+After uploading this `.txt` file for reference, you will see a cheerful prompt asking for the `.xlsx` file to process. The instructions below detail the steps ChatGPT will perform.
+
+## Workflow Steps
+
+1. **Filter Rows Based on "Huvudpersoner_STAMPLINGAR"**:
+   - Retain only rows where the **"Huvudpersoner_STAMPLINGAR"** column contains both:
+     - A time after **"In"** or **"IN"** (e.g., `IN 05:51`).
+     - A time after **"Ut"** or **"UT"** (e.g., `Ut 17:31` or `UT 14:30`).
+   - This now includes cases where "In/IN" or "Ut/UT" may have additional text like `ÖB In 09:46 UT 19:34`.
+   - Logic:
+     ```python
+     def contains_in_and_ut(value):
+         if isinstance(value, str):
+             # Check for "In/IN" followed by time and "Ut/UT" followed by time in any order
+             has_in = re.search(r'(In|IN)\s+\d{2}:\d{2}', value)
+             has_ut = re.search(r'(Ut|UT)\s+\d{2}:\d{2}', value)
+             return bool(has_in and has_ut)
+         return False
+     filtered_df = df[df['Huvudpersoner_STAMPLINGAR'].apply(contains_in_and_ut)]
+     ```
+
+2. **Process "Huvudpersoner_STAMPLINGAR"**:
+   - Extract **"Ut/UT" times** into a new column named **"Huvudpersoner_STAMPLINGAR_UT"**.
+   - Retain only **"In/IN" times** in the original **"Huvudpersoner_STAMPLINGAR"** column.
+   - Logic:
+     ```python
+     def extract_ut_time(value):
+         if isinstance(value, str):
+             match = re.search(r'(Ut|UT)\s+(\d{2}:\d{2})', value)
+             if match:
+                 return match.group(2)
+         return None
+
+     def retain_in_time(value):
+         if isinstance(value, str):
+             match = re.search(r'(In|IN)\s+(\d{2}:\d{2})', value)
+             if match:
+                 return match.group(2)
+         return None
+
+     df['Huvudpersoner_STAMPLINGAR_UT'] = df['Huvudpersoner_STAMPLINGAR'].apply(extract_ut_time)
+     df['Huvudpersoner_STAMPLINGAR'] = df['Huvudpersoner_STAMPLINGAR'].apply(retain_in_time)
+     ```
+
+3. **Filter Rows Based on "Total_TOTAL_TXT"**:
+   - Retain only rows where the **"Total_TOTAL_TXT"** column contains the value **"Arbetadtid"**.
+   - Logic:
+     ```python
+     filtered_df = df[df['Total_TOTAL_TXT'] == 'Arbetadtid']
+     ```
+
+4. **Add "BREAK" Column**:
+   - Add a new column named **"BREAK"** and set its value to **"0.5"** for rows that have data in the **"Huvudpersoner_DATUM"** column.
+   - Logic:
+     ```python
+     df['BREAK'] = df['Huvudpersoner_DATUM'].apply(lambda x: "0.5" if pd.notna(x) else "")
+     ```
+
+5. **Retain and Rearrange Columns**:
+   - Ensure the columns **"Huvudpersoner_ANST_NR"**, **"Huvudpersoner_NAMN"**, and **"Huvudpersoner_DATUM"** are always retained.
+   - Rearrange the columns to have the following order:
+     - **"Huvudpersoner_ANST_NR"**
+     - **"Huvudpersoner_NAMN"**
+     - **"Huvudpersoner_DATUM"**
+     - **"Huvudpersoner_STAMPLINGAR"**
+     - **"Huvudpersoner_STAMPLINGAR_UT"**
+     - **"BREAK"**
+   - Remove all other columns.
+   - Logic:
+     ```python
+     columns_to_keep = [
+         'Huvudpersoner_ANST_NR',
+         'Huvudpersoner_NAMN',
+         'Huvudpersoner_DATUM',
+         'Huvudpersoner_STAMPLINGAR',
+         'Huvudpersoner_STAMPLINGAR_UT',
+         'BREAK'
+     ]
+     filtered_df = filtered_df.reindex(columns=columns_to_keep)
+     ```
+
+6. **Handle .xls Files**:
+   - If the user uploads a `.xls` file, ChatGPT will not process the file.
+   - Instead, the user will be instructed to open the file in Excel, save it as a `.xlsx` file, and re-upload it. ChatGPT will not attempt to process `.xls` files or display steps during this conversion.
+
+7. **Final Step: Rename the Processed File**:
+   - Save the processed file with the same name as the uploaded file, but append **"_processed"** to a simplified version of the filename to avoid special characters.
+   - Logic:
+     ```python
+     uploaded_file_name = "example.xlsx"  # Replace with actual filename
+     file_name_without_extension, file_extension = os.path.splitext(uploaded_file_name)
+     simplified_file_name = "".join(c for c in file_name_without_extension if c.isalnum() or c == "_")
+     final_file_name = f"{simplified_file_name}_processed{file_extension}"
+     df.to_excel(final_file_name, index=False)
+     ```
+
+---
+
+## Important Notes for the User
+- **Step 1**: Upload this `.txt` file for reference.
+- **Step 2**: Upload a `.xlsx` file (not `.xls`) for processing.
+- **Step 3**: The `.xlsx` file is for use with **Flexime time import**, specifically for the customer **Tamro AB**.
+- **Step 4**: Wait for ChatGPT to confirm the processing is complete before uploading or performing additional actions.
