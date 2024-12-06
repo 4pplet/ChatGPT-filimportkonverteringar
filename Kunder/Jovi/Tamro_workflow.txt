@@ -6,6 +6,8 @@ Welcome to the file import conversion tool using ChatGPT! Your task is to proces
 
 After uploading this `.txt` file for reference, you will see a cheerful prompt asking for the `.xlsx` file to process. The instructions below detail the steps ChatGPT will perform.
 
+After completing the steps. Provide the processed file to the user as a .xlsx.
+
 ## Workflow Steps
 
 1. **Filter Rows Based on "Huvudpersoner_STAMPLINGAR"**:

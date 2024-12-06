@@ -1,0 +1,73 @@
+
+# Instructions for ChatGPT File Conversion Workflow
+
+## Introduction
+Welcome to the file import conversion tool using ChatGPT! Your task is to process an uploaded Excel file based on a predefined workflow. **Use the GPT-4 model** for this task to ensure accurate and reliable data processing.
+
+After uploading this `.txt` file for reference, you will see a cheerful prompt asking for the `.xlsx` file to process. The instructions below detail the steps ChatGPT will perform.
+
+After completing the steps. Provide the processed file to the user as a .xlsx.
+
+## Workflow Steps
+
+1. **Step 1:** Remove all rows above the row where the first cell contains "Anstnr".
+   - This ensures that the header row is properly aligned with the data.
+
+2. **Step 2:** Retain all columns and all data.
+   - Do not remove any columns or data, even if they appear unnecessary.
+   - Only apply formatting adjustments as specified below.
+
+3. **Step 3:** Format the "Datum" column to display the date only in `yyyy-mm-dd` format.
+   - Remove any time component (e.g., `2024-03-25 00:00:00` becomes `2024-03-25`).
+
+4. **Step 4:** Format the "Kom" and "Gå" columns to `hh:mm` (text).
+Format the "Kom" and "Gå" columns to hh:mm (text):
+
+   - Ensure time values in these columns are parsed flexibly to handle various formats (e.g., 6:59, 06:59, 06:59:00) and reformatted to hh:mm (removing seconds).
+   - If any time value cannot be parsed, the process should raise an error and stop, preventing the generation of the file. This ensures data integrity.
+
+Example Code with Validation:
+
+```def format_time_to_hh_mm(value):
+    try:
+        # Attempt to parse the time value flexibly and reformat it to hh:mm
+        time_parsed = pd.to_datetime(str(value), errors='coerce').time()  # Parse as time object
+        return time_parsed.strftime('%H:%M') if time_parsed else None
+    except (ValueError, TypeError):
+        # Return None if parsing fails
+        return None
+
+# Apply the formatting function to both columns and validate
+processed_data['Kom'] = processed_data['Kom'].apply(format_time_to_hh_mm)
+processed_data['Gå'] = processed_data['Gå'].apply(format_time_to_hh_mm)
+```
+
+# Validate that all cells in "Kom" and "Gå" have valid values
+if processed_data['Kom'].isnull().any() or processed_data['Gå'].isnull().any():
+    raise ValueError("Error: Some time values in 'Kom' or 'Gå' could not be parsed. Please check the input data.")
+
+
+5. **Handle .xls Files**:
+   - If the user uploads a `.xls` file, ChatGPT will not process the file.
+   - Instead, the user will be instructed to open the file in Excel, save it as a `.xlsx` file, and re-upload it. ChatGPT will not attempt to process `.xls` files or display steps during this conversion.
+
+7. **Final Step: Rename the Processed File**:
+   - Save the processed file with the same name as the uploaded file, but append **"_processed"** to a simplified version of the filename to avoid special characters.
+   - Logic:
+     ```python
+     uploaded_file_name = "example.xlsx"  # Replace with actual filename
+     file_name_without_extension, file_extension = os.path.splitext(uploaded_file_name)
+     simplified_file_name = "".join(c for c in file_name_without_extension if c.isalnum() or c == "_")
+     final_file_name = f"{simplified_file_name}_processed{file_extension}"
+     df.to_excel(final_file_name, index=False)
+     ```
+
+---
+
+These steps ensure no data is lost, and formatting aligns with the required specifications.
+
+## Important Notes for the User
+- **Step 1**: Upload this `.txt` file for reference.
+- **Step 2**: Upload a `.xlsx` file (not `.xls`) for processing.
+- **Step 3**: The `.xlsx` file is for use with **Flexime time import**, specifically for the customer **DHL Borås**.
+- **Step 4**: Wait for ChatGPT to confirm the processing is complete before uploading or performing additional actions.

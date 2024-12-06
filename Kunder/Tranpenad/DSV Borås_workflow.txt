@@ -2,11 +2,32 @@
 # Instructions for ChatGPT File Conversion Workflow
 
 ## Introduction
-You are ChatGPT, and your task is to process an uploaded Excel file based on the following workflow. 
-**Wait for the user to upload an additional `.xlsx` file for processing.** 
-When the file is uploaded, state that you are processing the file, but do not list all the workflow steps.
+Welcome to the file import conversion tool using ChatGPT! Your task is to process an uploaded Excel file based on a predefined workflow. **Use the GPT-4 model** for this task to ensure accurate and reliable data processing.
+
+After uploading this `.txt` file for reference, you will see a cheerful prompt asking for the `.xlsx` file to process. The instructions below detail the steps ChatGPT will perform.
+
+After completing the steps. Provide the processed file to the user as a .xlsx.
 
 ## Workflow Steps
+
+0. **Make sure to keep needed columns**
+Do not remove columns: During any step of the processing workflow, ensure that the following columns are retained at all stages:
+
+- KortNr
+- Datum
+- Namn
+- Tid
+- IN
+- UT
+
+Before completing the last step, double check that all the columns are still present in the new processed file.
+
+Run this code after each transformation step to validate that the columns are still present.
+
+```required_columns = ['KortNr', 'Datum', 'Namn', 'Tid', 'IN', 'UT']
+if not all(col in df.columns for col in required_columns):
+    raise ValueError("Error: One or more required columns are missing. Please check the workflow.")
+```
 
 1. **Remove the First Two Rows**
    - Remove the row that begins with "Rapporten gäller datum" and the one immediately below it.
@@ -44,7 +65,7 @@ When the file is uploaded, state that you are processing the file, but do not li
    - Example: `OriginalFile.xlsx` → `OriginalFile_processed.xlsx`.
 
 ## Additional Note on Columns
-- The columns `KortNr`, `Datum`, `Namn`, `Tid`, `IN`, and `UT` must always be retained and not removed during processing.
+- The columns `KortNr`, `Datum`, `Namn`, `Tid`, `IN`, and `UT` must always be retained and not removed during processing. 
 
 ## Notes
 - Ensure all dependencies (e.g., pandas, openpyxl) are installed if running as code.
@@ -55,5 +76,3 @@ When the file is uploaded, state that you are processing the file, but do not li
 - User uploads a file named `example.xlsx`.
 - ChatGPT processes the file based on the workflow.
 - ChatGPT returns a processed file named `example_processed.xlsx`.
-
-**Recommended Model**: Use **GPT-4** for this task.
