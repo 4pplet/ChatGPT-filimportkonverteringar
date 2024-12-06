@@ -1,0 +1,170 @@
+
+# Swedish Time Format Workflow for File Conversion
+
+## Introduction:
+This workflow is designed to process an Excel file and ensure it is compatible with the system by applying specific transformations to the data. The workflow includes the following steps to handle time formatting and data preparation.
+
+### File Requirements:
+- The file to be processed should be in `.xlsx` format.
+- The sheet containing the data to be processed is called **"FLEX"**.
+- Ensure the file is formatted according to these guidelines for proper processing.
+
+## Step 0: Improved Column Identification and Handling
+
+### Dynamic Column Identification:
+- Dynamically identify key columns such as 'IN', 'UT', and 'DATUM' based on their content or regular expression (regex) patterns.
+- Use pattern matching to identify columns representing time data (e.g., 'IN', 'IN.1', 'UT', 'UT.1') or date-related information (e.g., 'DATUM').
+
+### Using Pattern Matching:
+- Pattern matching ensures accurate identification of time and date columns, even if column names are misaligned or renamed unexpectedly.
+
+### Enhanced Error Logging:
+- If columns like 'IN' or 'UT' are missing or incorrectly identified, log a detailed message and suggest that the user review the file.
+
+### Fallback Mechanism:
+- If no matching columns are found, use a fallback to search for columns based on common patterns like 'DATUM' for date columns and 'IN/UT' for time columns.
+
+## Step 1: Remove Rows with Empty 'IN' or 'UT' Columns
+- Remove all rows where the 'IN' or 'UT' columns contain invalid values (e.g., '-'). Ensure that only rows with valid time values are retained.
+
+## Step 2: Normalize Date Formats
+- Format all dates in `yyyymmdd` format to `yyyy-mm-dd` across the entire file.
+
+## Step 3: Format 'IN' and 'UT' Times to 'hh:mm'
+- Apply a dynamic conversion to the 'IN' and 'UT' columns that accounts for various time formats (including `hh:mm:ss` and `hh:mm`). If a time is in `hh:mm:ss`, convert it to `hh:mm`.
+
+## Step 4: Convert 'IN' and 'UT' Columns to Text Format
+- Explicitly convert the 'IN' and 'UT' columns to text format to prevent Excel from automatically reformatting the times. This ensures that times are consistently displayed in the `hh:mm` format when the file is opened in Excel.
+
+```python
+df_flex_cleaned['IN'] = df_flex_cleaned['IN'].astype(str)
+df_flex_cleaned['UT'] = df_flex_cleaned['UT'].astype(str)
+```
+
+## Step 5: Remove Duplicate 'IN' and 'UT' Columns
+- Remove duplicate 'IN' and 'UT' columns (e.g., 'IN.1', 'UT.1'), retaining only the first occurrence of each column.
+
+## Step 6: Remove Invalid or Duplicate Rows
+- Remove rows where either 'IN' or 'UT' contains invalid placeholders (e.g., '-'). Ensure that only valid time values are retained.
+
+## Step 7: Validate and Reformat Dates
+- Reformat the 'Datum' column to the Swedish date format `yyyy-mm-dd`. Ensure no time values are included in the 'Datum' column.
+- Validate that all 'Datum' values are in the correct format; if any invalid values are found, log the error and halt the process.
+
+## Step 8: Save the Processed File
+- Save the cleaned and processed data to a new `.xlsx` file, appending "_processed" to the original filename.
+
+## Updated Dynamic Time Conversion Logic
+For the 'IN' and 'UT' columns, the time data should be dynamically handled. The following function will:
+- Convert times in `hh:mm:ss` format to `hh:mm`.
+- Ensure times are correctly formatted as `hh:mm`, without overwriting correct values like `07:19`.
+
+```python
+import re
+import pandas as pd
+import datetime
+
+def dynamic_time_conversion(value):
+    try:
+        # Handle times in 'hh:mm:ss' format and convert to 'hh:mm'
+        if isinstance(value, str):
+            value = value.strip()  # Remove any spaces
+            
+            # Handle 'hh:mm:ss' format (remove seconds)
+            if re.match(r'^\d{2}:\d{2}:\d{2}$', value):
+                return value[:5]  # Convert to 'hh:mm' by removing seconds
+            
+            # If already in 'hh:mm' format, return as is
+            elif re.match(r'^\d{2}:\d{2}$', value):
+                return value
+            
+            # Try to convert any other format to 'hh:mm' using pandas
+            return pd.to_datetime(value, errors='coerce').strftime('%H:%M')
+        
+        # In case of datetime.time objects, directly convert to 'hh:mm' format
+        if isinstance(value, datetime.time):
+            return value.strftime('%H:%M')
+        
+        # If none of the above, return the value as is
+        return value
+    except Exception:
+        return 'Invalid'  # Fallback to 'Invalid' in case of conversion failure
+
+# Apply the dynamic time conversion function to both 'IN' and 'UT' columns
+df_flex_cleaned['IN'] = df_flex_cleaned['IN'].apply(dynamic_time_conversion)
+df_flex_cleaned['UT'] = df_flex_cleaned['UT'].apply(dynamic_time_conversion)
+```
+
+## Code Example for Full Workflow Execution:
+```python
+import pandas as pd
+import re
+import datetime
+
+# Load the data
+df = pd.read_excel('your_file.xlsx', sheet_name='FLEX')
+
+# Step 1: Remove rows with empty 'IN' or 'UT' columns
+df = df[~df['IN'].isin(['-'])]
+df = df[~df['UT'].isin(['-'])]
+
+# Step 2: Normalize Date Formats
+df['Datum'] = pd.to_datetime(df['Datum'], format='%Y%m%d').dt.strftime('%Y-%m-%d')
+
+# Step 3: Apply dynamic time conversion for 'IN' and 'UT' columns
+df['IN'] = df['IN'].apply(dynamic_time_conversion)
+df['UT'] = df['UT'].apply(dynamic_time_conversion)
+
+# Step 4: Convert 'IN' and 'UT' columns to Text Format
+df['IN'] = df['IN'].astype(str)
+df['UT'] = df['UT'].astype(str)
+
+# Step 5: Remove Duplicate 'IN' and 'UT' Columns
+df = df.loc[:, ~df.columns.str.contains(r'IN\.|UT\.')]
+
+# Step 6: Save the Processed File
+df.to_excel('processed_file.xlsx', index=False)
+```
+
+This updated workflow ensures the correct handling of time data for row 30 and all other rows without manual intervention.
+
+
+### Step 3: Format 'IN' and 'UT' Times to 'hh:mm'
+- Apply a dynamic conversion to both 'IN' and 'UT' columns to ensure that all time values, including those in the 'hh:mm:ss' format, are converted to 'hh:mm'.
+
+### Updated Instructions:
+
+```python
+# Adjust the dynamic time conversion to ensure consistency in 'IN' and 'UT' columns
+def dynamic_time_conversion(value):
+    try:
+        # Handle times in 'hh:mm:ss' format and convert to 'hh:mm'
+        if isinstance(value, str):
+            value = value.strip()  # Remove any spaces
+            
+            # Handle 'hh:mm:ss' format (remove seconds)
+            if re.match(r'^\d{2}:\d{2}:\d{2}$', value):
+                return value[:5]  # Convert to 'hh:mm' by removing seconds
+            
+            # If already in 'hh:mm' format, return as is
+            elif re.match(r'^\d{2}:\d{2}$', value):
+                return value
+            
+            # Try to convert any other format to 'hh:mm' using pandas
+            return pd.to_datetime(value, errors='coerce').strftime('%H:%M')
+        
+        # In case of datetime.time objects, directly convert to 'hh:mm' format
+        if isinstance(value, datetime.time):
+            return value.strftime('%H:%M')
+        
+        # If none of the above, return the value as is
+        return value
+    except Exception:
+        return 'Invalid'  # Fallback to 'Invalid' in case of conversion failure
+
+# Apply dynamic time conversion to both 'IN' and 'UT' columns
+df['IN'] = df['IN'].apply(dynamic_time_conversion)
+df['UT'] = df['UT'].apply(dynamic_time_conversion)
+```
+
+This update ensures that all time values in the 'IN' and 'UT' columns are consistently formatted as 'hh:mm', regardless of whether they are initially in 'hh:mm:ss' or 'hh:mm'.

@@ -1,0 +1,139 @@
+
+# Tamro Workflow with Embedded Code and Original Instructions
+
+## Introduction
+Welcome to the file import conversion tool using ChatGPT! Your task is to process an uploaded Excel file based on a predefined workflow. **Use the GPT-4 model** for this task to ensure accurate and reliable data processing.
+
+After uploading this `.txt` file for reference, you will see a cheerful prompt asking for the `.xlsx` file to process. The instructions below detail the steps ChatGPT will perform.
+
+After completing the steps, provide the processed file to the user as a `.xlsx`.
+
+---
+
+## Workflow Steps
+
+### Step 1: Filter Rows Based on "Huvudpersoner_STAMPLINGAR"
+- Retain only rows where the **"Huvudpersoner_STAMPLINGAR"** column contains both:
+  - A time after **"In"** or **"IN"** (e.g., `IN 05:51`).
+  - A time after **"Ut"** or **"UT"** (e.g., `UT 17:31`).
+- This now includes cases where "In/IN" or "Ut/UT" may have additional text like `ÖB In 09:46 UT 19:34`.
+
+#### Suggested Python Code for Step 1:
+```python
+import pandas as pd
+import re
+
+# Load the file
+file_path = 'Tamro.xlsx'  # Update with the correct file path
+df = pd.read_excel(file_path)
+
+# Function to check if a value contains both "In" and "Ut"
+def contains_in_and_ut(value):
+    if isinstance(value, str):
+        # Check for "In/IN" followed by time and "Ut/UT" followed by time in any order
+        has_in = re.search(r'(In|IN)\s+\d{2}:\d{2}', value)
+        has_ut = re.search(r'(Ut|UT)\s+\d{2}:\d{2}', value)
+        return bool(has_in and has_ut)
+    return False
+
+# Filter rows
+filtered_df = df[df['Huvudpersoner_STAMPLINGAR'].apply(contains_in_and_ut)]
+```
+
+---
+
+### Step 2: Process "Huvudpersoner_STAMPLINGAR"
+- Extract **"Ut/UT" times** into a new column named **"Huvudpersoner_STAMPLINGAR_UT"**.
+- Retain only **"In/IN" times** in the original **"Huvudpersoner_STAMPLINGAR"** column.
+
+#### Suggested Python Code for Step 2:
+```python
+# Function to extract "UT" time
+def extract_ut_time(value):
+    if isinstance(value, str):
+        match = re.search(r'(Ut|UT)\s+(\d{2}:\d{2})', value)
+        if match:
+            return match.group(2)
+    return None
+
+# Function to retain "IN" time
+def retain_in_time(value):
+    if isinstance(value, str):
+        match = re.search(r'(In|IN)\s+(\d{2}:\d{2})', value)
+        if match:
+            return match.group(2)
+    return None
+
+# Apply transformations
+filtered_df['Huvudpersoner_STAMPLINGAR_UT'] = filtered_df['Huvudpersoner_STAMPLINGAR'].apply(extract_ut_time)
+filtered_df['Huvudpersoner_STAMPLINGAR'] = filtered_df['Huvudpersoner_STAMPLINGAR'].apply(retain_in_time)
+```
+
+---
+
+### Step 3: Filter Rows Based on "Total_TOTAL_TXT"
+- Retain only rows where the **"Total_TOTAL_TXT"** column contains the value **"Arbetadtid"**.
+
+#### Suggested Python Code for Step 3:
+```python
+filtered_df = filtered_df[filtered_df['Total_TOTAL_TXT'] == 'Arbetadtid']
+```
+
+---
+
+### Step 4: Add "BREAK" Column
+- Add a new column named **"BREAK"** and set its value to **"0.5"** for rows that have data in the **"Huvudpersoner_DATUM"** column.
+
+#### Suggested Python Code for Step 4:
+```python
+filtered_df['BREAK'] = filtered_df['Huvudpersoner_DATUM'].apply(lambda x: "0.5" if pd.notna(x) else "")
+```
+
+---
+
+### Step 5: Retain and Rearrange Columns
+- Ensure the columns **"Huvudpersoner_ANST_NR"**, **"Huvudpersoner_NAMN"**, and **"Huvudpersoner_DATUM"** are always retained.
+- Rearrange the columns to have the following order:
+  - **"Huvudpersoner_ANST_NR"**
+  - **"Huvudpersoner_NAMN"**
+  - **"Huvudpersoner_DATUM"**
+  - **"Huvudpersoner_STAMPLINGAR"**
+  - **"Huvudpersoner_STAMPLINGAR_UT"**
+  - **"BREAK"**
+- Remove all other columns.
+
+#### Suggested Python Code for Step 5:
+```python
+columns_to_keep = [
+    'Huvudpersoner_ANST_NR',
+    'Huvudpersoner_NAMN',
+    'Huvudpersoner_DATUM',
+    'Huvudpersoner_STAMPLINGAR',
+    'Huvudpersoner_STAMPLINGAR_UT',
+    'BREAK'
+]
+final_df = filtered_df.reindex(columns=columns_to_keep)
+```
+
+---
+
+### Step 6: Save the Processed File
+- Save the processed file with the same name as the uploaded file, appending **"_processed"** to the name.
+
+#### Suggested Python Code for Step 6:
+```python
+output_path = 'Tamro_processed.xlsx'  # Update with the desired output path
+final_df.to_excel(output_path, index=False)
+
+print(f"Processed file saved at: {output_path}")
+```
+
+---
+
+## Notes for Users
+- If the user uploads a `.xls` file, ChatGPT will not process the file.
+- Instead, the user will be instructed to open the file in Excel, save it as a `.xlsx` file, and re-upload it.
+- ChatGPT will not attempt to process `.xls` files or display steps during this conversion.
+
+---
+

@@ -1,0 +1,112 @@
+
+# Swedish Time Format Workflow for File Conversion
+
+## Introduction
+Welcome to the file conversion workflow! This workflow processes an Excel file to make it compatible with your system by applying a series of transformations to specific columns. Follow these steps to process your file using Python and Pandas.
+
+Guide the user to upload a second file for conversion then make the converted file available for download. Don't give the user too much unnecessary info about the conversion. Rather say hold on or something similarly polite. If they upload a file that doesn't contain valid data, like for instance is not a .xlsx or doesn't contain the sheet named FLEX, don't try to convert the file. Ask the user to upload a valid file.
+
+Do these steps below for all the rows in the file. Don't skip rows!
+
+---
+
+### Step 0: Preprocessing - Remove Invalid Header Rows and Normalize Column Names
+
+#### Description:
+Some files may contain invalid rows at the beginning or misaligned headers. This step ensures the correct header row is set and that all column names are normalized by removing leading and trailing spaces.
+
+#### Python Implementation:
+```python
+# Find the header row containing the column 'Datum' and set it as the header
+header_row_index = data[data.iloc[:, 0].str.contains('Datum', na=False)].index[0]
+data.columns = data.iloc[header_row_index].str.strip()  # Normalize column names
+data = data.iloc[header_row_index + 1:]  # Remove rows above the header row
+```
+
+---
+
+### Step 1: Remove Rows Where `IN` or `UT` Contains `-`
+
+#### Description:
+Remove rows where the `IN` or `UT` column contains the placeholder value `-`, as such rows indicate missing or invalid data.
+
+#### Python Implementation:
+```python
+# Remove rows with '-' in the 'IN' or 'UT' columns
+filtered_data = data[~((data['IN'] == '-') | (data['UT'] == '-'))].copy()
+```
+
+---
+
+### Step 2: Remove Duplicate `IN` and `UT` Columns
+
+#### Description:
+Some files may contain duplicate columns for `IN` and `UT` (e.g., `IN.1` and `UT.1`). Keep only the first occurrence of these columns and remove the duplicates.
+
+#### Python Implementation:
+```python
+# Remove duplicate columns with the same names (e.g., 'IN.1', 'UT.1')
+filtered_data = filtered_data.loc[:, ~filtered_data.columns.duplicated()]
+```
+
+---
+
+### Step 3: Reformat Times to Swedish Format (`hh:mm`)
+
+#### Description:
+The `IN` and `UT` columns often have inconsistent formats, such as `hh:mm:ss` (e.g., `07:19:00`), `hh:mm` (e.g., `07:19`), or `datetime.time` objects. This step ensures all time values in the `IN` and `UT` columns are reformatted to the Swedish `hh:mm` format.
+
+#### Python Implementation:
+```python
+import pandas as pd
+import datetime
+
+def enforce_time_format_with_datetime(value):
+    try:
+        if isinstance(value, pd.Timestamp):  
+            return value.strftime('%H:%M')
+        elif isinstance(value, datetime.time):  
+            return value.strftime('%H:%M')
+        elif isinstance(value, str):
+            if re.match(r'^\d{2}:\d{2}:\d{2}$', value):
+                return value[:5]
+            elif re.match(r'^\d{2}:\d{2}$', value):
+                return value
+        return pd.to_datetime(value, errors='coerce').strftime('%H:%M')
+    except Exception:
+        return value
+
+filtered_data['IN'] = filtered_data['IN'].apply(enforce_time_format_with_datetime)
+filtered_data['UT'] = filtered_data['UT'].apply(enforce_time_format_with_datetime)
+```
+
+---
+
+### Step 4: Reformat the `DATUM` Column to Swedish Format (`yyyy-mm-dd`)
+
+#### Description:
+Convert all values in the `DATUM` column to the Swedish date format `yyyy-mm-dd`, ensuring no time values are included.
+
+#### Python Implementation:
+```python
+# Reformat 'DATUM' column to Swedish 'yyyy-mm-dd' format
+filtered_data['DATUM'] = pd.to_datetime(filtered_data['DATUM'], errors='coerce').dt.strftime('%Y-%m-%d')
+```
+
+---
+
+### Final Step: Save the Processed File
+
+#### Description:
+Save the processed data to a new `.xlsx` file with "_processed" appended to the original filename.
+
+#### Python Implementation:
+```python
+# Save the processed data to a new file
+output_file_path = 'processed_file.xlsx'
+filtered_data.to_excel(output_file_path, index=False, sheet_name='FLEX')
+```
+
+---
+
+This workflow ensures consistent formatting and cleanses the data for further processing. Let me know if you'd like to apply it or make further adjustments.
