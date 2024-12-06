@@ -64,6 +64,13 @@ if not all(col in df.columns for col in required_columns):
    - Save the processed file with the same name as the uploaded file, but append `_processed` to a simplified version of the filename to avoid special characters.
    - Example: `OriginalFile.xlsx` → `OriginalFile_processed.xlsx`.
 
+8. Provide the Download Link:
+
+    - After the processed file is saved, ensure that a download link is generated for the user.
+    - Ensure that the file is available for immediate download by including the following:
+        - Save the file with a name that includes "_processed" to avoid conflicts with the original file.
+        - Provide the user with a direct download link.
+
 ## Additional Note on Columns
 - The columns `KortNr`, `Datum`, `Namn`, `Tid`, `IN`, and `UT` must always be retained and not removed during processing. 
 

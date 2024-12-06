@@ -1,0 +1,95 @@
+
+Updated Workflow for DSV Borås
+
+Introduction
+This workflow ensures that the uploaded Excel file is processed correctly with dynamic header detection and the specified transformations.
+
+Updated Workflow Steps
+
+Step 0: Header Detection
+Before proceeding with the existing steps in the workflow, ensure the header is detected properly by following these instructions:
+
+1. Search for the Header Dynamically:
+   - Look for a row containing the word "Datum" (case-insensitive) to find the correct header row.
+   - If no direct match is found, fall back to the first row that contains more than 3 non-empty columns (which should be a good indicator that it's the header).
+
+2. Validation:
+   - After identifying the header row, validate that the key columns such as "KortNr", "Datum", "Namn", and "Tid" are present. If any are missing, log the error and stop the process.
+
+3. Set the Header:
+   - Once the header is identified, set it as the column names for the DataFrame and drop the row used for the header.
+
+Code Example for Header Detection:
+```python
+import re
+
+def find_header(df):
+    # Search for the header row containing 'Datum' (case-insensitive)
+    for idx, row in df.iterrows():
+        if re.search(r'(?i)datum', str(row[0])):  # Case-insensitive search for "Datum"
+            return idx  # Found a potential header row
+    
+    # Fallback: Find the first row with at least 3 non-empty columns
+    for idx, row in df.iterrows():
+        if row.count() >= 3:
+            return idx  # Fallback to first row with sufficient data
+    
+    raise ValueError("Error: Unable to locate the header row. Please inspect the file.")
+
+# Example usage:
+header_row_idx = find_header(df)
+df.columns = df.iloc[header_row_idx]  # Set header row
+df = df.drop(header_row_idx)  # Drop the header row from the data
+```
+
+Step 0.1: Convert Columns to String (Before Applying `.str` Operations)
+Before performing any string operations, ensure the relevant columns are explicitly converted to strings. This step will prevent errors when non-string data is encountered in those columns.
+
+For example, before performing any operations on the `Tid` column, ensure that it is treated as a string:
+```python
+# Ensure the 'Tid' column is treated as strings
+df['Tid'] = df['Tid'].astype(str)
+```
+
+You can add this step to other columns as needed, such as `KortNr`, `Datum`, or any other columns that will have string operations applied.
+
+Step 1: Remove the First Two Rows
+- Remove the row that begins with "Rapporten gäller datum" and the one immediately below it.
+
+Step 2: Format Dates
+- Format all dates in the file from `yyyymmdd` to `yyyy-mm-dd`.
+
+Step 3: Extract and Split Times
+- Identify the column named "Tid" (or "Unnamed: 3").
+- Split the values in this column (formatted as `xx:xx - xx:xx`) into two times:
+    - Keep the first time (`xx:xx`) in the original column.
+    - Move the second time (`xx:xx`) to a new column named "UT" located immediately to the right of "Tid."
+- Remove the hyphen (`-`) in the time format.
+- Rename the "Tid" column to "IN."
+
+Step 4: Remove Columns to the Right of 'UT'
+- Remove all columns to the right of "UT," except for specific columns listed below.
+
+Step 5: Rename Specific Columns
+- Rename columns as follows:
+  - Any column whose header starts with "Rapporten gäller datum" → Rename to "KortNr."
+  - Column "Unnamed: 1" → Rename to "Datum."
+  - Column "Unnamed: 2" → Rename to "Namn."
+
+Step 6: Retain Only Required Columns
+- Ensure that the final file retains the following columns:
+  - `KortNr`
+  - `Datum`
+  - `Namn`
+  - Two time columns: `IN` and `UT` (formatted as `xx:xx`).
+  - Do not remove these columns during any part of the processing.
+
+Step 7: Save the Processed File
+- Save the processed file with the same name as the uploaded file, but append `_processed` to a simplified version of the filename to avoid special characters.
+- Example: `OriginalFile.xlsx` → `OriginalFile_processed.xlsx`.
+
+Additional Notes:
+- Dynamic Header Handling: The header row is now dynamically detected and set based on the content of the file.
+- Validation: The header detection step includes checks to ensure the key columns are present before proceeding.
+- Error Handling: If the header cannot be found or key columns are missing, an error is logged, and the process stops.
+- Column String Conversion: Added an additional step to convert columns to strings before performing string operations to avoid errors when encountering non-string data.
