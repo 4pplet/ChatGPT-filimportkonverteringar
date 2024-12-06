@@ -1,0 +1,160 @@
+
+### Updated Workflow for File Processing
+
+#### Step 1: Load the File
+Load the Excel file into a DataFrame.
+
+```python
+import pandas as pd
+
+file_path = 'path_to_file.xlsx'
+try:
+    df = pd.read_excel(file_path, sheet_name=None)  # Load all sheets
+except Exception as e:
+    raise ValueError(f"Error loading the file: {e}")
+```
+---
+
+#### Step 2: Identify and Set the Header Row
+Locate the header row dynamically and set it as the DataFrame's header.
+
+```python
+try:
+    processed_sheets = {}
+    for sheet_name, sheet_data in df.items():
+        header_row_index = sheet_data[sheet_data.apply(
+            lambda row: row.astype(str).str.contains('datum', case=False, na=False).any(), axis=1
+        )].index[0]
+        sheet_data.columns = sheet_data.iloc[header_row_index].str.strip()
+        sheet_data = sheet_data[header_row_index + 1:].reset_index(drop=True)
+        processed_sheets[sheet_name] = sheet_data
+except IndexError:
+    raise ValueError("Header row not found. Check for structural issues in the dataset.")
+except Exception as e:
+    raise ValueError(f"Error identifying or setting the header row: {e}")
+```
+---
+
+#### Step 3: Reformat the Datum Column
+Convert the `Datum` column to the Swedish date format (yyyy-mm-dd). Handle missing or invalid entries.
+
+```python
+try:
+    for sheet_name, sheet_data in processed_sheets.items():
+        if 'Datum' in sheet_data.columns:
+            sheet_data['Datum'] = pd.to_datetime(sheet_data['Datum'].str.strip(), errors='coerce').dt.strftime('%Y-%m-%d')
+except Exception as e:
+    raise ValueError(f"Error formatting 'Datum' column: {e}")
+```
+---
+
+#### Step 4: Remove Rows with Empty Cells in "Stämplad tid"
+Exclude all rows where the "Stämplad tid" column has empty or missing values.
+
+```python
+try:
+    for sheet_name, sheet_data in processed_sheets.items():
+        if 'Stämplad tid' in sheet_data.columns:
+            sheet_data = sheet_data[sheet_data['Stämplad tid'].notna() & (sheet_data['Stämplad tid'].str.strip() != '')]
+except Exception as e:
+    raise ValueError(f"Error removing rows with empty 'Stämplad tid': {e}")
+```
+---
+
+#### Step 5: Remove Rows Where "Stämplad tid" Contains "Total"
+Exclude all rows where the "Stämplad tid" column contains the value "Total."
+
+```python
+try:
+    for sheet_name, sheet_data in processed_sheets.items():
+        if 'Stämplad tid' in sheet_data.columns:
+            sheet_data = sheet_data[sheet_data['Stämplad tid'].str.strip().str.lower() != 'total']
+except Exception as e:
+    raise ValueError(f"Error removing rows with 'Total' in 'Stämplad tid': {e}")
+```
+---
+
+#### Step 6: Split "Stämplad tid" by Newline into Multiple Rows
+For rows where "Stämplad tid" contains multiple lines (e.g., separated by `
+`), create a new row for each time range.
+
+```python
+try:
+    for sheet_name, sheet_data in processed_sheets.items():
+        if 'Stämplad tid' in sheet_data.columns:
+            sheet_data = sheet_data.assign(
+                **{'Stämplad tid': sheet_data['Stämplad tid'].str.split('
+')}
+            ).explode('Stämplad tid').reset_index(drop=True)
+except Exception as e:
+    raise ValueError(f"Error splitting 'Stämplad tid' by newline: {e}")
+```
+---
+
+#### Step 7: Add a New Column "Stämplad tid UT"
+Insert a new empty column named "Stämplad tid UT" next to "Stämplad tid."
+
+```python
+try:
+    for sheet_name, sheet_data in processed_sheets.items():
+        if 'Stämplad tid' in sheet_data.columns:
+            col_index = sheet_data.columns.get_loc('Stämplad tid') + 1
+            sheet_data.insert(col_index, 'Stämplad tid UT', '')
+except Exception as e:
+    raise ValueError(f"Error adding 'Stämplad tid UT' column: {e}")
+```
+---
+
+#### Step 8: Split Time Ranges into Two Columns
+Split the "Stämplad tid" column by ` - ` to separate the start and end times into "Stämplad tid" and "Stämplad tid UT."
+
+```python
+try:
+    for sheet_name, sheet_data in processed_sheets.items():
+        if 'Stämplad tid' in sheet_data.columns and 'Stämplad tid UT' in sheet_data.columns:
+            def split_time_range(value):
+                if pd.isna(value):
+                    return value, ''
+                if '-' in value:
+                    parts = value.split(' - ', 1)
+                    return parts[0].strip(), parts[1].strip()
+                return value.strip(), ''
+
+            split_times = sheet_data['Stämplad tid'].apply(split_time_range)
+            sheet_data['Stämplad tid'], sheet_data['Stämplad tid UT'] = zip(*split_times)
+except Exception as e:
+    raise ValueError(f"Error splitting time ranges: {e}")
+```
+---
+
+#### Step 9: Retain Specific Columns and Exclude "Skifttider"
+Keep only the following columns: `Arbetad enhet`, `Hemmaenhet`, `Hemmakostnadsställe`, `Anställningsnr.`, `Förnamn`, `Efternamn`, `Skifttyp`, `Stämplad tid`, `Stämplad tid UT`. Remove all other columns, including `Skifttider`.
+
+```python
+columns_to_keep = [
+    'Arbetad enhet', 'Hemmaenhet', 'Hemmakostnadsställe', 'Anställningsnr.',
+    'Förnamn', 'Efternamn', 'Skifttyp', 'Stämplad tid', 'Stämplad tid UT'
+]
+
+try:
+    for sheet_name, sheet_data in processed_sheets.items():
+        sheet_data = sheet_data[[col for col in columns_to_keep if col in sheet_data.columns]]
+        processed_sheets[sheet_name] = sheet_data
+except Exception as e:
+    raise ValueError(f"Error retaining specified columns: {e}")
+```
+---
+
+#### Step 10: Save the Processed File
+Save the processed dataset to a new Excel file.
+
+```python
+output_path = 'processed_file.xlsx'
+try:
+    with pd.ExcelWriter(output_path) as writer:
+        for sheet_name, sheet_data in processed_sheets.items():
+            sheet_data.to_excel(writer, sheet_name=sheet_name, index=False)
+    print(f"File saved successfully to {output_path}")
+except Exception as e:
+    raise ValueError(f"Error saving the file: {e}")
+```
