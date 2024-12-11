@@ -1,0 +1,90 @@
+
+# Jönköping Workflow for File Processing
+
+## Introduction
+Welcome to the file import conversion tool using ChatGPT! Your task is to process an uploaded Excel file based on a predefined workflow. **Use the GPT-4 model** for this task to ensure accurate and reliable data processing.
+
+After uploading this `.txt` file for reference, you will see a cheerful prompt asking for the `.xls` file to process. The instructions below detail the steps ChatGPT will perform. If the file is password protected, ask the user to upload a file with the password removed.
+
+After completing the steps, provide the processed file to the user as a `.xlsx`.
+
+---
+
+## Workflow Steps
+
+### **New Step: Detect and Align Columns**
+- Before processing the dataset, ensure that the correct row is used as the header to align the column names properly.
+- In cases where the first row is not the header, reload the dataset using the correct row (typically the second or first row with meaningful data).
+
+#### **Python Code for Alignment:**
+```python
+# Reload the dataset using the first row as the header
+df = pd.read_excel('file_path.xlsx', header=1)  # Adjust header index based on the structure
+```
+- Verify the column names to ensure they align with the expected workflow. If columns like `'Från'` and `'Till'` are missing, inspect the dataset for proper alignment:
+```python
+# Display column names to check alignment
+print(df.columns)
+```
+- If necessary, manually rename misaligned columns to match expected names:
+```python
+df.rename(columns={'ColumnX': 'Expected Name', 'ColumnY': 'Expected Name'}, inplace=True)
+```
+
+---
+
+### Step 1: Remove Rows with Invalid Times in 'Från' or 'Till'
+- Remove all rows where the **'Från'** or **'Till'** column does not contain valid time values in the format **hh:mm**.
+
+#### Suggested Python Code:
+```python
+# Convert 'Från' and 'Till' columns to datetime
+df['Från'] = pd.to_datetime(df['Från'], format='%H:%M', errors='coerce')
+df['Till'] = pd.to_datetime(df['Till'], format='%H:%M', errors='coerce')
+
+# Drop rows with invalid times
+filtered_df = df.dropna(subset=['Från', 'Till'])
+```
+
+---
+
+### Step 2: Format Time Columns
+- Format the **'Från'** and **'Till'** columns as text in the **hh:mm** format.
+- Remove any date or seconds, ensuring only the time is retained.
+
+#### Suggested Python Code:
+```python
+# Format 'Från' and 'Till' as text in 'hh:mm' format
+filtered_df['Från'] = filtered_df['Från'].dt.strftime('%H:%M')
+filtered_df['Till'] = filtered_df['Till'].dt.strftime('%H:%M')
+```
+
+---
+
+### Step 3: Format 'Skiftdatum'
+- Format the **'Skiftdatum'** column as text in the format **yyyy-mm-dd**.
+- Remove any time components from this column, ensuring consistency.
+
+#### Suggested Python Code:
+```python
+# Format 'Skiftdatum' as 'yyyy-mm-dd'
+filtered_df['Skiftdatum'] = pd.to_datetime(filtered_df['Skiftdatum'], errors='coerce').dt.strftime('%Y-%m-%d')
+```
+
+---
+
+### Step 4: Save Processed File
+- Save the cleaned and formatted dataset as a new Excel file.
+
+#### Suggested Python Code:
+```python
+# Save the processed file
+filtered_df.to_excel('Jönköping_Cleaned_2024-03-25_2024-03-31.xlsx', index=False)
+```
+
+---
+
+## Notes
+- This workflow ensures that all time and date columns are consistently formatted.
+- Always validate the output to ensure no rows with essential data were unintentionally removed.
+- The workflow is tailored for the **Jönköping 2024-03-25 - 2024-03-31.xlsx** file but can be adapted for similar datasets.
